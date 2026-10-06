@@ -38,8 +38,11 @@ class _RaisingParser(argparse.ArgumentParser):
 
 
 def _tz(value: str) -> Any:
+    from datetime import timezone
     from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+    if value.upper() in ("UTC", "Z"):
+        return timezone.utc  # needs no time zone database
     try:
         return ZoneInfo(value)
     except (ZoneInfoNotFoundError, ValueError) as exc:

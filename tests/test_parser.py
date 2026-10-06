@@ -107,7 +107,9 @@ def test_jdk8_dump_inside_crlf_log(fixtures):
 
 def test_multiple_dumps_in_one_input(fixtures):
     text = (
-        (fixtures / "aem-node1-1.dump").read_text() + "\nsome log line\n" + (fixtures / "aem-node1-2.dump").read_text()
+        (fixtures / "aem-node1-1.dump").read_text(encoding="utf-8")
+        + "\nsome log line\n"
+        + (fixtures / "aem-node1-2.dump").read_text(encoding="utf-8")
     )
     dumps = list(parse_lines(text.splitlines(), source="x"))
     assert [d.index for d in dumps] == [0, 1]

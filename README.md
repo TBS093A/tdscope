@@ -9,7 +9,8 @@ Command-line analyzer for Java (HotSpot) thread dumps. Point it at a directory o
 - **who blocks whom**: lock owners, their waiters and JVM-detected deadlocks,
 - **who burns CPU** between two dumps.
 
-The CLI has no runtime dependencies (Python 3.10+ standard library only), so it also
+The CLI has no runtime dependencies (Python 3.10+ standard library only; `tzdata` on
+Windows, which has no time zone database), so it also
 runs on a locked-down production box. An optional [interactive TUI](#interactive-tui)
 with a timeline graph needs [Textual](https://textual.textualize.io/).
 

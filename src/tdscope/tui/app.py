@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import io
+import os
 import shlex
 from collections.abc import Sequence
 from datetime import datetime, timezone, tzinfo
@@ -88,6 +89,14 @@ ChartScreen #hover { padding: 0 1; }
 def _short(text: str, root: str | None) -> str:
     """Strip the opened folder from file paths inside ``text``."""
     return strip_root(text, root) if root else text
+
+
+def split_command(text: str, windows: bool = os.name == "nt") -> list[str]:
+    """Split a ``:`` command line; on Windows backslashes are path separators, not escapes."""
+    if not windows:
+        return shlex.split(text)
+    words = shlex.split(text, posix=False)
+    return [w[1:-1] if len(w) >= 2 and w[0] == w[-1] and w[0] in "\"'" else w for w in words]
 
 
 def _span(start: datetime, end: datetime) -> str:
@@ -517,7 +526,7 @@ class TdscopeApp(App[None]):
     def _command_submitted(self, event: Input.Submitted) -> None:
         self.action_hide_command()
         try:
-            words = shlex.split(event.value.strip().lstrip(":"))
+            words = split_command(event.value.strip().lstrip(":"))
         except ValueError as exc:
             self.notify(str(exc), severity="error")
             return

@@ -22,12 +22,12 @@ def test_demo_dumps(tmp_path):
     dumps = load([str(tmp_path)])
     assert len(dumps) == 2 * DUMPS and len(by_jvm(dumps)) == 2
     for path in tmp_path.rglob("*.dump"):  # parser accounts for everything in the demo files
-        raw = count(path.read_text())
+        raw = count(path.read_text(encoding="utf-8"))
         assert raw.threads == sum(len(d.threads) for d in dumps if d.source == str(path))
 
 
 def test_screenshots_referenced_by_the_guide_exist_and_are_svg():
-    guide = (DOCS / "TUI.md").read_text() + (DOCS.parent / "README.md").read_text()
+    guide = (DOCS / "TUI.md").read_text(encoding="utf-8") + (DOCS.parent / "README.md").read_text(encoding="utf-8")
     names = {line.split("screenshots/")[1].split(")")[0] for line in guide.splitlines() if "screenshots/" in line}
     names.discard("`.")  # prose mentioning the folder
     assert len(names) >= 10

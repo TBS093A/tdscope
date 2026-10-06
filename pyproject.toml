@@ -22,7 +22,9 @@ classifiers = [
     "Topic :: Software Development :: Debuggers",
     "Topic :: System :: Monitoring",
 ]
-dependencies = []
+dependencies = [
+    "tzdata; sys_platform == 'win32'",  # Windows has no system time zone database
+]
 
 [project.optional-dependencies]
 tui = ["textual>=8"]
