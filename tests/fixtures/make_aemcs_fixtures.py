@@ -301,7 +301,7 @@ def wcm_request(start: datetime) -> Thread:
 def write(out: Path, pod: str, window: int, jvm: Jvm, at: datetime, threads: list[Thread]) -> None:
     directory = out / f"aem-author-{pod}_{window}_threaddumps"
     directory.mkdir(parents=True, exist_ok=True)
-    (directory / f"aem-author-{pod}-{at:%Y-%m-%d.%H-%M-%S}.dump").write_text(render(jvm, at, threads))
+    (directory / f"aem-author-{pod}-{at:%Y-%m-%d.%H-%M-%S}.dump").write_bytes(render(jvm, at, threads).encode())
 
 
 def main(out: Path = OUT) -> None:

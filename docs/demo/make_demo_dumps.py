@@ -230,7 +230,9 @@ def main(out: Path) -> None:
                         )
                     )
             threads += jetty_threads(rng, n, at.replace(tzinfo=UTC), burst)
-            (directory / f"{jvm_name}-{at:%Y-%m-%d.%H-%M-%S}.dump").write_text(render(jvm, at, threads + vm_threads()))
+            (directory / f"{jvm_name}-{at:%Y-%m-%d.%H-%M-%S}.dump").write_bytes(
+                render(jvm, at, threads + vm_threads()).encode()
+            )
 
 
 if __name__ == "__main__":

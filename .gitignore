@@ -7,6 +7,7 @@ __pycache__/
 build/
 dist/
 *.egg-info/
+src/tdscope/_version.py
 .DS_Store
 
 # Never commit real thread dumps: they contain hostnames, URLs, user data.
@@ -16,3 +17,6 @@ dist/
 tdscope-*.txt
 tdscope-*.json
 tdscope-*.html
+
+# Private words (client names, hosts) checked by the pre-commit hook; never commit this.
+.private-patterns

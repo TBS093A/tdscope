@@ -24,7 +24,9 @@ _THREAD_HEADER_RE = re.compile(
     r'^"(?P<name>.*)"\s+(?P<rest>(?:#\d+|\[\d+\]|daemon|prio=|os_prio=|cpu=|elapsed=|tid=|nid=).*)$'
 )
 _STATE_RE = re.compile(r"^java\.lang\.Thread\.State:\s*(?P<state>[A-Z_]+)(?:\s*\((?P<detail>.*)\))?")
-_LOCK_RE = re.compile(r"^-\s+(?P<kind>[a-z][a-z \-()]*?)\s+<(?P<addr>[^>]*)>\s*(?:\(a (?P<cls>.+)\))?\s*$")
+# Lock kind = words separated by single spaces ("waiting to re-lock in wait()"). A lazy
+# class including the space, followed by \s+, backtracks quadratically on long lines.
+_LOCK_RE = re.compile(r"^-\s+(?P<kind>[a-z()\-]+(?: [a-z()\-]+)*)\s+<(?P<addr>[^>]*)>\s*(?:\(a (?P<cls>.+)\))?\s*$")
 _SYNC_RE = re.compile(r"^-\s+<(?P<addr>[^>]*)>\s*(?:\(a (?P<cls>.+)\))?\s*$")
 _DEADLOCK_START_RE = re.compile(r"^Found one Java-level deadlock:")
 _DEADLOCK_END_RE = re.compile(r"^Found \d+ deadlocks?\.")

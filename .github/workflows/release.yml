@@ -1,0 +1,145 @@
+# Release: pushing a tag vX.Y.Z publishes tdscope X.Y.Z to PyPI.
+#
+# Gates, in order: tag format, tag on main, dated CHANGELOG entry, the full CI and
+# security workflows, build + install verification on 3 OSes, built version == tag,
+# manual approval of the "pypi" environment. Afterwards: GitHub release with build
+# provenance, and installing the published release from PyPI on 3 OSes.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: release checks
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: check
+        name: Tag format, tag on main, changelog entry
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [[ ! "$TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+)?)$ ]]; then
+            echo "::error::tag '$TAG' is not vX.Y.Z (optionally aN, bN, rcN)"; exit 1
+          fi
+          version="${BASH_REMATCH[1]}"
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$TAG does not point to a commit on main"; exit 1
+          fi
+          if ! grep -Eq "^## ${version//./\\.} - [0-9]{4}-[0-9]{2}-[0-9]{2}" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md needs a section '## $version - YYYY-MM-DD'"; exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  ci:
+    needs: check
+    uses: ./.github/workflows/ci.yml
+
+  security:
+    needs: check
+    uses: ./.github/workflows/security.yml
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+
+  build:
+    needs: check
+    uses: ./.github/workflows/build.yml
+
+  publish-pypi:
+    name: publish to PyPI
+    needs: [check, ci, security, build]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi # protected: requires a reviewer's approval (docs/RELEASING.md)
+      url: https://pypi.org/project/tdscope/${{ needs.check.outputs.version }}/
+    permissions:
+      id-token: write # trusted publishing (OIDC) + PEP 740 attestations
+    steps:
+      - name: Built version matches the tag
+        env:
+          BUILT: ${{ needs.build.outputs.version }}
+          TAGGED: ${{ needs.check.outputs.version }}
+        run: |
+          if [[ "$BUILT" != "$TAGGED" ]]; then
+            echo "::error::built $BUILT but the tag says $TAGGED"; exit 1
+          fi
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: dist
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+
+  github-release:
+    name: GitHub release
+    needs: [check, publish-pypi]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the release
+      id-token: write # sign the provenance
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: dist
+          path: dist
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
+        with:
+          subject-path: dist/*
+      - name: Create the release with notes from CHANGELOG.md
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          awk -v v="$VERSION" '$0 ~ "^## " {p = index($0, "## " v " ") == 1; next} p' CHANGELOG.md > notes.md
+          gh release create "$TAG" dist/* --verify-tag --title "tdscope $VERSION" --notes-file notes.md
+
+  verify-pypi:
+    name: verify PyPI release (${{ matrix.os }})
+    needs: [check, publish-pypi]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.13"
+      - name: Install the release from PyPI (waits for the index to update)
+        shell: bash
+        env:
+          VERSION: ${{ needs.check.outputs.version }}
+        run: |
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            python -m pip install --no-cache-dir "tdscope[tui]==$VERSION" && exit 0
+            echo "not available yet (attempt $attempt), retrying in 30 s"; sleep 30
+          done
+          exit 1
+      - name: Smoke test the published package
+        shell: bash
+        env:
+          VERSION: ${{ needs.check.outputs.version }}
+        run: python scripts/smoke_test.py --version "$VERSION" --tui

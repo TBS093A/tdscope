@@ -1,0 +1,20 @@
+# SCA, continuous: update pinned GitHub Actions and Python dependencies weekly.
+# Security updates for vulnerable dependencies are opened as soon as an advisory appears.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    versioning-strategy: increase-if-necessary
+    groups:
+      python:
+        patterns: ["*"]

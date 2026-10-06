@@ -1,0 +1,6 @@
+# Normalize text files to LF in the repository.
+* text=auto eol=lf
+
+# Thread dump fixtures are compared byte for byte (one is CRLF on purpose): never convert.
+tests/fixtures/** -text
+docs/screenshots/*.svg -text
