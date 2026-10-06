@@ -10,7 +10,9 @@ from tdscope.timeline import (
     OTHER,
     OTHER_COLOR,
     build_chart,
+    code_name,
     describe,
+    family_name,
     format_duration,
     group_of,
     pool_name,
@@ -154,3 +156,106 @@ def test_html_export_escapes_thread_names(aemcs):
 )
 def test_pool_name(name, pool):
     assert pool_name(name) == pool
+
+
+@pytest.mark.parametrize(
+    ("name", "family"),
+    [
+        ("sling-threadpool-0f1e2d3c-4b5a-4697-8877-665544332211-(apache-sling-job-thread-pool)-3", "sling-threadpool"),
+        ("sling-oak-observation-12", "sling-oak"),
+        ("oak-lucene-4", "oak-lucene"),
+        ("sling-12", "sling"),
+        ("OkHttp api.example.com Writer", "OkHttp"),
+        ("EventAdminAsyncThread #3", "EventAdminAsyncThread"),
+        ("NewsFeed-Notifier-2", "NewsFeed"),  # capital N is a letter, not a digit placeholder
+        ("pool-3-thread-7", "Executors (pool-N-thread-N)"),
+        ("Thread-12", "unnamed (Thread-N)"),
+        ("qtp1996920089-84", "Jetty (qtp)"),
+        ("C2 CompilerThread0", "JVM internal"),
+        ("ParGC Thread#3", "JVM internal"),
+        ("Notification Thread", "JVM internal"),
+        ("main", "main"),
+    ],
+)
+def test_family_name(name, family):
+    assert family_name(name) == family
+
+
+def _with_frames(frames):
+    from tdscope.model import ThreadInfo
+
+    return ThreadInfo(name="t", header="", frames=frames)
+
+
+@pytest.mark.parametrize(
+    ("frames", "code"),
+    [
+        (
+            ["java.lang.Object.wait(Native Method)", "org.apache.jackrabbit.oak.cache.CacheLIRS.get(CacheLIRS.java:1)"],
+            "org.apache.jackrabbit",
+        ),
+        (["okhttp3.internal.http2.Http2Reader.nextFrame(Http2Reader.java:89)"], "okhttp3"),
+        (["io.wcm.caconfig.extensions.X.load(X.java:1)"], "io.wcm.caconfig"),
+        (
+            [
+                "jdk.internal.misc.Unsafe.park(Native Method)",
+                "java.util.concurrent.LinkedBlockingQueue.take(LinkedBlockingQueue.java:433)",
+                "java.util.concurrent.ThreadPoolExecutor.getTask(ThreadPoolExecutor.java:1054)",
+                "java.lang.Thread.run(Thread.java:834)",
+            ],
+            "idle: executor worker (ThreadPoolExecutor)",
+        ),
+        (
+            ["java.lang.Object.wait(Native Method)", "java.util.TimerThread.mainLoop(Timer.java:553)"],
+            "idle: java.util.Timer",
+        ),
+        (
+            [
+                "java.lang.Object.wait(Native Method)",
+                "java.lang.Object.wait(Object.java:328)",
+                "java.util.prefs.FileSystemPreferences$1.run(FileSystemPreferences.java:9)",
+                "java.lang.Thread.run(Thread.java:834)",
+            ],
+            "JDK: FileSystemPreferences$1.run",
+        ),
+        ([], "JVM internal (no Java stack)"),
+    ],
+)
+def test_code_name(frames, code):
+    assert code_name(_with_frames(frames)) == code
+
+
+def test_other_lists_its_members(aemcs):
+    chart = build_chart(aemcs, mode="count", group_by="pool", max_groups=4)
+    other = chart.series[-1]
+    assert other.group == OTHER and other.members
+    assert sum(n for _, n in other.members) == other.total
+    assert chart.other_groups == [g for g, _ in other.members]
+    assert [n for _, n in other.members] == sorted((n for _, n in other.members), reverse=True)
+    for point in other.points:  # each count point says what it is made of
+        assert sum(point.breakdown.values()) == point.value
+    busiest = max(other.points, key=lambda p: p.value)
+    assert "made of" in describe(busiest)
+
+
+def test_drill_into_other(aemcs):
+    top = build_chart(aemcs, mode="count", group_by="pool", max_groups=4)
+    inner = build_chart(aemcs, mode="count", group_by="pool", max_groups=4, only_groups=top.other_groups)
+    assert {s.group for s in inner.series} - {OTHER} <= set(top.other_groups)
+    assert sum(s.total for s in inner.series) == top.series[-1].total
+    deeper = build_chart(aemcs, mode="count", group_by="pool", max_groups=4, only_groups=inner.other_groups)
+    assert sum(s.total for s in deeper.series) == inner.series[-1].total
+
+
+def test_code_grouping_keeps_other_small(aemcs):
+    by_code = build_chart(aemcs, mode="count", group_by="code")
+    assert OTHER not in {s.group for s in by_code.series}
+    assert "idle: executor worker (ThreadPoolExecutor)" not in {s.group for s in by_code.series}
+    assert {"org.apache.jackrabbit", "org.eclipse.jetty", "okhttp3"} <= {s.group for s in by_code.series}
+
+
+def test_html_explains_other(aemcs):
+    chart = build_chart(aemcs, mode="count", group_by="pool", max_groups=4)
+    page = to_html(chart)
+    assert f'what is in "other" ({len(chart.other_groups)} groups)' in page
+    assert all(g.replace("&", "&amp;") in page for g in chart.other_groups)

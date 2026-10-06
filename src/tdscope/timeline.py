@@ -17,7 +17,7 @@ import json
 import math
 import re
 from collections import Counter, defaultdict
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, tzinfo
 
@@ -25,7 +25,7 @@ from .filters import ThreadFilter
 from .model import ThreadDump, ThreadInfo
 
 MODES = ("count", "duration")
-GROUPINGS = ("pool", "state", "request")
+GROUPINGS = ("pool", "family", "code", "state", "request")
 # Okabe-Ito based, distinguishable for common color-vision deficiencies.
 PALETTE = ("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#8DD3C7", "#FB8072")
 OTHER = "other"
@@ -47,8 +47,81 @@ def pool_name(thread_name: str) -> str:
     return _NUMBERS.sub("N", base) or "(unnamed)"
 
 
+_JVM_INTERNAL = re.compile(
+    r"^(VM |GC |G1 |ParGC |Par |C1 |C2 |C\d |Compiler|Reference Handler|Finalizer|Signal Dispatcher|"
+    r"Service Thread|Sweeper thread|Common-Cleaner|Attach Listener|Notification Thread|Monitor Deflation|"
+    r"JFR |ZGC|ZDirector|ZStat|Shenandoah|Concurrent |Periodic GC|Surrogate Locker|Java2D Disposer|"
+    r"process reaper|DestroyJavaVM)"
+)
+_FAMILY_TWO_WORDS = re.compile(r"([a-z][a-z0-9]*)([- ])([A-Za-z][A-Za-z]*)")
+_FAMILY_WORD = re.compile(r"[A-Za-z][A-Za-z0-9/]*")
+
+
+def family_name(thread_name: str) -> str:
+    """Coarse family of a thread: "JVM internal", "Jetty (qtp)", "sling-threadpool", "OkHttp", ..."""
+    if _JVM_INTERNAL.match(thread_name):
+        return "JVM internal"
+    pool = pool_name(thread_name)
+    if pool.startswith("qtp"):
+        return "Jetty (qtp)"
+    if pool.startswith("pool-N-thread"):
+        return "Executors (pool-N-thread-N)"
+    if pool.startswith("Thread-N"):
+        return "unnamed (Thread-N)"
+    # "sling-threadpool-*-(...)" -> "sling-threadpool", "oak-lucene-N" -> "oak-lucene"
+    two = _FAMILY_TWO_WORDS.match(pool)
+    if two and two.group(3) != "N":
+        return two.group(0)
+    one = _FAMILY_WORD.match(pool)
+    return one.group(0) if one else "(unnamed)"
+
+
+_JDK_PREFIXES = ("java.", "javax.", "jdk.", "sun.", "com.sun.", "jakarta.")
+# JDK-only stacks are identified by a characteristic frame (most are idle workers).
+_JDK_MARKERS = (
+    ("java.util.concurrent.ScheduledThreadPoolExecutor$DelayedWorkQueue.take", "idle: scheduled executor"),
+    ("java.util.concurrent.ThreadPoolExecutor.getTask", "idle: executor worker (ThreadPoolExecutor)"),
+    ("java.util.concurrent.ForkJoinPool.awaitWork", "idle: ForkJoinPool worker"),
+    ("java.util.concurrent.ForkJoinPool.runWorker", "ForkJoinPool worker"),
+    ("java.util.TimerThread.mainLoop", "idle: java.util.Timer"),
+    ("java.lang.ref.", "JVM: reference handling"),
+    ("java.net.SocketInputStream.socketRead0", "network read (JDK)"),
+    ("sun.nio.ch.", "network / NIO (JDK)"),
+    ("java.lang.Thread.sleep", "sleeping (JDK)"),
+)
+
+
+def _package(frame: str) -> str:
+    """Package of a frame, shortened: "org.apache.jackrabbit.oak.x.Y.m(..)" -> "org.apache.jackrabbit"."""
+    parts = frame.split("(", 1)[0].split(".")[:-2]  # drop class and method
+    if not parts:
+        return frame.split("(", 1)[0]
+    first = parts[0]
+    is_tld = len(first) <= 3 and first.isalpha()  # org, com, io, net, de, ...
+    return ".".join(parts[:3] if is_tld else parts[:1])
+
+
+def code_name(thread: ThreadInfo) -> str:
+    """What code a thread runs: package of its top-most non-JDK frame."""
+    if not thread.frames:
+        return "JVM internal (no Java stack)"
+    for frame in thread.frames:
+        if not frame.startswith(_JDK_PREFIXES):
+            return _package(frame)
+    for marker, label in _JDK_MARKERS:
+        if any(f.startswith(marker) for f in thread.frames):
+            return label
+    runnable = [f for f in thread.frames if not f.startswith("java.lang.Thread.run")]
+    bottom = (runnable or thread.frames)[-1].split("(", 1)[0]
+    return "JDK: " + ".".join(bottom.split(".")[-2:])
+
+
 def group_of(thread: ThreadInfo, by: str) -> str | None:
     """Group a thread belongs to; ``None`` excludes it from the chart."""
+    if by == "family":
+        return "HTTP requests" if thread.request is not None else family_name(thread.name)
+    if by == "code":
+        return code_name(thread)
     if by == "state":
         return thread.state or "(VM internal)"
     if by == "request":
@@ -83,6 +156,7 @@ class Point:
     dump: ThreadDump
     threads: list[ThreadInfo]  # all threads behind the point (one in duration mode)
     duration_kind: str | None = None  # "request age" or "thread age"
+    breakdown: dict[str, int] = field(default_factory=dict)  # count mode, "other": threads per merged group
 
 
 @dataclass
@@ -91,6 +165,7 @@ class Series:
     color: str
     total: int  # thread snapshots in this group
     points: list[Point] = field(default_factory=list)
+    members: list[tuple[str, int]] = field(default_factory=list)  # "other": merged groups and their totals
 
 
 @dataclass
@@ -103,6 +178,11 @@ class Chart:
     y_max: float
     dumps: int
     invalid_request_ages: int = 0  # request start after dump time: wrong time zone
+
+    @property
+    def other_groups(self) -> list[str]:
+        """Groups merged into "other" (most threads first), e.g. to chart them on their own."""
+        return [g for s in self.series if s.group == OTHER for g, _ in s.members]
 
     @property
     def points(self) -> list[Point]:
@@ -158,7 +238,9 @@ def build_chart(
     group_by: str = "pool",
     tz: tzinfo | None = None,
     max_groups: int = len(PALETTE),
+    only_groups: Collection[str] | None = None,
 ) -> Chart:
+    """Build the chart; ``only_groups`` keeps just these groups (to look inside "other")."""
     if mode not in MODES:
         raise ValueError(f"unknown mode: {mode}")
     flt = flt or ThreadFilter()
@@ -169,7 +251,7 @@ def build_chart(
     for i, dump in enumerate(timed):
         for thread in dump.threads:
             group = group_of(thread, group_by) if flt.matches(thread) else None
-            if group is not None:
+            if group is not None and (only_groups is None or group in only_groups):
                 members[(i, group)].append(thread)
                 totals[group] += 1
 
@@ -179,7 +261,8 @@ def build_chart(
     rename = {g: (g if g in color else OTHER) for g in ranked}
     series = {g: Series(g, color[g], totals[g]) for g in shown}
     if len(shown) < len(ranked):
-        series[OTHER] = Series(OTHER, OTHER_COLOR, sum(totals[g] for g in ranked if g not in color))
+        merged = [(g, totals[g]) for g in ranked if g not in color]
+        series[OTHER] = Series(OTHER, OTHER_COLOR, sum(n for _, n in merged), members=merged)
 
     invalid = 0
     for i, dump in enumerate(timed):
@@ -190,7 +273,11 @@ def build_chart(
         for name, s in series.items():
             threads = per_series.get(name, [])
             if mode == "count":
-                s.points.append(Point(dump.timestamp, float(len(threads)), name, dump, threads))
+                point = Point(dump.timestamp, float(len(threads)), name, dump, threads)
+                if s.members:
+                    counts = ((g, len(members.get((i, g), []))) for g, _ in s.members)
+                    point.breakdown = dict(sorted(((g, n) for g, n in counts if n), key=lambda gn: -gn[1]))
+                s.points.append(point)
                 continue
             for thread in threads:
                 value, kind, bad = _duration(dump, thread, tz)
@@ -219,6 +306,12 @@ def describe(point: Point, max_frames: int = 8) -> str:
         lines = [f"{point.group}: {len(point.threads)} thread(s) at {when}", f"dump: {point.dump.source}"]
         states = Counter(t.state or "(no state)" for t in point.threads)
         lines.append("states: " + (", ".join(f"{k}={v}" for k, v in states.most_common()) or "-"))
+        if point.breakdown:
+            lines.append(f"made of {len(point.breakdown)} group(s):")
+            lines += [f"  {n:>5}  {g}" for g, n in list(point.breakdown.items())[:12]]
+            if len(point.breakdown) > 12:
+                lines.append(f"  ... {len(point.breakdown) - 12} more groups")
+            lines.append("threads:")
         lines += [f"  {t.name}  [{t.state or '-'}]" for t in point.threads[:15]]
         if len(point.threads) > 15:
             lines.append(f"  ... {len(point.threads) - 15} more")
@@ -316,11 +409,25 @@ def to_html(chart: Chart, title: str = "tdscope timeline") -> str:
         group_parts.append("</g>")
         parts.append("".join(group_parts))
 
+    def legend_title(s: Series) -> str:
+        if not s.members:
+            return ""
+        lines = [f"{n}  {g}" for g, n in s.members[:30]]
+        if len(s.members) > 30:
+            lines.append(f"... {len(s.members) - 30} more groups")
+        return f' title="{esc(chr(10).join(lines))}"'
+
     legend = "".join(
-        f'<button class="key" data-series="{i}" aria-pressed="true">'
+        f'<button class="key" data-series="{i}" aria-pressed="true"{legend_title(s)}>'
         f'<span class="swatch" style="background:{s.color}"></span>{esc(s.group)} <small>{s.total}</small></button>'
         for i, s in enumerate(chart.series)
     )
+    if chart.other_groups:
+        rows = "".join(f"<li><small>{n}</small> {esc(g)}</li>" for s in chart.series for g, n in s.members)
+        legend += (
+            f'<details class="other"><summary>what is in "other" ({len(chart.other_groups)} groups)</summary>'
+            f"<ol>{rows}</ol></details>"
+        )
     y_label = "threads" if chart.mode == "count" else "duration (log scale): request age, else thread age"
     note = ""
     if chart.invalid_request_ages:
@@ -347,6 +454,8 @@ circle {{ stroke:var(--bg); stroke-width:1; cursor:pointer; }} circle:hover {{ s
   color:var(--fg); border-radius:6px; padding:4px 8px; cursor:pointer; font:inherit; }}
 .key[aria-pressed="false"] {{ opacity:.4; }} .swatch {{ width:12px; height:12px; border-radius:3px; }}
 .key small {{ color:var(--muted); }} .hidden {{ display:none; }}
+.other {{ flex-basis:100%; color:var(--muted); }} .other ol {{ columns:3 240px; margin:6px 0; font-size:12px; }}
+.other small {{ display:inline-block; min-width:4em; text-align:right; margin-right:6px; }}
 #tip {{ position:fixed; pointer-events:none; white-space:pre; font:12px ui-monospace, monospace;
   background:var(--panel); color:var(--fg); border:1px solid var(--grid); border-radius:6px; padding:8px;
   max-width:90vw; overflow:hidden; display:none; }}

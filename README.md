@@ -136,7 +136,17 @@ a legend:
 
 - `m` switches the Y axis between *thread count* per group and *duration* (one point
   per thread: request age when the request start is known, else thread age; log scale);
-- `b` groups threads by pool (ids and counters normalized), by state, or by request;
+- `b` changes the grouping:
+  - `pool`: thread pool name, ids and counters normalized (`sling-threadpool-*-(…)-N`);
+  - `family`: coarser name families (`JVM internal`, `Jetty (qtp)`, `sling-oak`, `OkHttp`, …);
+  - `code`: what the thread executes, i.e. the package of its top-most non-JDK frame
+    (`org.apache.jackrabbit`, `okhttp3`, …); JDK-only stacks are recognised by their
+    characteristic frame (`idle: executor worker`, `idle: java.util.Timer`, …);
+  - `state` (`java.lang.Thread.State`) or `request` (HTTP method and path);
+- groups that do not get one of the 9 colors are merged into **other**: the legend lists
+  what it is made of, hovering an "other" point shows the breakdown at that moment, and
+  `o` charts just those groups with their own colors (repeat to go deeper, `esc` to go
+  back);
 - `j` switches between JVMs (dumps of one JVM process, or all of them);
 - hover a point with the mouse, or move with the arrow keys / `n` `p`, to see the
   thread, its state, duration, CPU and top frames;

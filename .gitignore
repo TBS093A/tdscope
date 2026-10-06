@@ -11,3 +11,8 @@ dist/
 
 # Never commit real thread dumps: they contain hostnames, URLs, user data.
 /dumps/
+
+# Default names of reports and charts exported from the TUI (they contain dump data).
+tdscope-*.txt
+tdscope-*.json
+tdscope-*.html

@@ -10,4 +10,6 @@ First public release.
 - Text and JSON output.
 - `tdscope tui`: k9s-style terminal UI (optional `tui` extra) with forms for every
   analysis, a command line, export to text/JSON and a timeline graph (thread count or
-  duration over time, colored by group, hover details, HTML export).
+  duration over time, colored by group, hover details, HTML export). Groupings by pool,
+  family, code (package of the executing frame), state or request; the "other" group
+  is broken down in the legend and on hover and can be expanded into its own chart.

@@ -240,7 +240,10 @@ async def test_timeline_chart(warsaw_local_time):
 
         await pilot.press("b")
         await pilot.pause()
-        assert widget.chart.group_by == "state" and widget.hidden == frozenset()
+        assert widget.chart.group_by == "family" and widget.hidden == frozenset()
+        await pilot.press("b", "b")
+        await pilot.pause()
+        assert widget.chart.group_by == "state"
 
         await pilot.press("j", "j", "j")  # pod B, restarted pod A, all JVMs
         await pilot.pause()
@@ -297,3 +300,41 @@ async def test_export_format_follows_file_extension(tmp_path):
         await pilot.press("enter")
         await _until(app, pilot, lambda: target.exists())
         assert len(json.loads(target.read_text())) == 7
+
+
+async def test_chart_expands_other():
+    app = TdscopeApp(str(AEMCS))
+    async with app.run_test(size=SIZE) as pilot:
+        await _until(app, pilot, lambda: app.last is not None)
+        await pilot.press("g", "j", "j", "j")  # all JVMs, grouped by pool: more groups than colors
+        await pilot.pause()
+        screen = app.screen
+        widget = screen.query_one(ChartWidget)
+        merged = widget.chart.other_groups
+        assert merged
+        legend = str(screen.query_one("#legend", Static).render())
+        assert f"└ {widget.chart.series[-1].members[0][1]:>6} {merged[0]}" in legend
+        assert "o: chart them on their own" in legend
+
+        await pilot.press("o")
+        await pilot.pause()
+        assert screen.drill == [merged]
+        assert {s.group for s in widget.chart.series} == set(merged)  # few enough to all get a color
+        assert "> other(" in str(screen.query_one("#chart-title", Static).render())
+
+        await pilot.press("o")  # nothing left to expand
+        await pilot.pause()
+        assert len(screen.drill) == 1
+
+        await pilot.press("escape")  # back to the full chart, still on the graph
+        await pilot.pause()
+        assert isinstance(app.screen, ChartScreen) and screen.drill == []
+        assert widget.chart.other_groups == merged
+
+        await pilot.press("o", "b")  # changing the grouping leaves the drill-down
+        await pilot.pause()
+        assert screen.drill == []
+
+        await pilot.press("escape")
+        await pilot.pause()
+        assert not isinstance(app.screen, ChartScreen)

@@ -103,8 +103,9 @@ class ChartScreen(Screen[None]):
     """Threads over time, colored by group, with hover details."""
 
     BINDINGS = [
-        Binding("escape,q", "app.pop_screen", "back"),
+        Binding("escape,q", "back", "back"),
         Binding("m", "mode", "mode"),
+        Binding("o", "expand_other", "expand other"),
         Binding("b", "group_by", "group by"),
         Binding("j", "jvm", "JVM"),
         Binding("z", "timezone", "time zone"),
@@ -128,6 +129,7 @@ class ChartScreen(Screen[None]):
         self.zone_index = 0
         self.zone_explicit = tz is not None
         self.chart: Chart | None = None
+        self.drill: list[list[str]] = []  # groups charted on their own after "expand other", per level
 
     def _jvm_label(self, series: list[ThreadDump]) -> str:
         first, last = series[0], series[-1]
@@ -168,14 +170,17 @@ class ChartScreen(Screen[None]):
     def _rebuild(self) -> None:
         label, dumps = self.jvms[self.jvm_index]
         zone_label, zone = self.zones[self.zone_index]
-        self.chart = build_chart(dumps, mode=self.mode, group_by=self.group_by, tz=zone)
+        only = self.drill[-1] if self.drill else None
+        self.chart = build_chart(dumps, mode=self.mode, group_by=self.group_by, tz=zone, only_groups=only)
         widget = self.query_one(ChartWidget)
         widget.hidden = frozenset()
         widget.chart = self.chart
         y = "threads" if self.mode == "count" else "duration, log scale (request age, else thread age)"
         title = Text.assemble(
             ("timeline ", "bold"),
-            (f"mode={self.mode}  by={self.group_by}  tz={zone_label}  ", ""),
+            (f"mode={self.mode}  by={self.group_by}", ""),
+            ("".join(f" > other({len(level)})" for level in self.drill), "bold yellow"),
+            (f"  tz={zone_label}  ", ""),
             (f"JVM: {label}  ", "italic"),
             (f"Y: {y}", "dim"),
         )
@@ -195,7 +200,15 @@ class ChartScreen(Screen[None]):
             text.append("● ", style="dim" if dim else f"bold {s.color}")
             text.append(f"{s.group[:40]} ", style="dim strike" if dim else "")
             text.append(f"{s.total}\n", style="dim")
-        text.append("1-9 show/hide · m mode · b group by · j JVM", style="dim")
+            for group, total in s.members[:6]:
+                text.append(f"    └ {total:>6} ", style="dim")
+                text.append(f"{group[:38]}\n")
+            if len(s.members) > 6:
+                text.append(f"    └ ... {len(s.members) - 6} more groups\n", style="dim")
+            if s.members:
+                text.append("    o: chart them on their own\n", style="bold yellow")
+        hints = "1-9 show/hide · m mode · b group by · j JVM"
+        text.append(hints + (" · esc: back from other" if self.drill else ""), style="dim")
         self.query_one("#legend", Static).update(text)
 
     @on(ChartWidget.Hovered)
@@ -230,11 +243,28 @@ class ChartScreen(Screen[None]):
 
     def action_group_by(self) -> None:
         self.group_index = (self.group_index + 1) % len(GROUPINGS)
+        self.drill = []
         self._rebuild()
 
     def action_jvm(self) -> None:
         self.jvm_index = (self.jvm_index + 1) % len(self.jvms)
+        self.drill = []
         self._rebuild()
+
+    def action_expand_other(self) -> None:
+        """Chart only the groups merged into "other", each with its own color."""
+        if self.chart is None or not self.chart.other_groups:
+            self.notify("no 'other' group on this chart")
+            return
+        self.drill.append(self.chart.other_groups)
+        self._rebuild()
+
+    def action_back(self) -> None:
+        if self.drill:
+            self.drill.pop()
+            self._rebuild()
+        else:
+            self.app.pop_screen()
 
     def action_timezone(self) -> None:
         self.zone_index = (self.zone_index + 1) % len(self.zones)
@@ -262,8 +292,11 @@ class ChartScreen(Screen[None]):
 
 def _tooltip(point: Point) -> str:
     if point.duration_kind:
-        return f"{point.threads[0].name}\n{point.duration_kind}: {format_duration(point.value)}"
-    return f"{point.group}: {len(point.threads)} threads"
+        return f"{point.threads[0].name}\n{point.group}\n{point.duration_kind}: {format_duration(point.value)}"
+    text = f"{point.group}: {len(point.threads)} threads"
+    for group, count in list(point.breakdown.items())[:3]:
+        text += f"\n  {count:>4}  {group}"
+    return text
 
 
 class TdscopeApp(App[None]):
