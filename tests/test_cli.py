@@ -15,7 +15,7 @@ def test_json_output(fixtures, capsys):
 def test_output_file_and_top(fixtures, tmp_path, capsys):
     out = tmp_path / "report.txt"
     assert main(["frames", str(fixtures), "-m", "io.wcm.", "-t", "1", "-o", str(out)]) == 0
-    lines = out.read_text().splitlines()
+    lines = out.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 2 and "LinkHandlerImpl" in lines[1]
     assert "dump(s)" in capsys.readouterr().err
 
@@ -49,3 +49,11 @@ def test_invalid_timezone(fixtures):
 def test_top_limits_lock_contentions(fixtures, capsys):
     assert main(["locks", str(fixtures / "aemcs"), "-t", "1", "-f", "json", "-q"]) == 0
     assert len(json.loads(capsys.readouterr().out)["contentions"]) == 1
+
+
+def test_utc_needs_no_time_zone_database():
+    from datetime import timezone
+
+    from tdscope.cli import _tz
+
+    assert _tz("UTC") is timezone.utc and _tz("utc") is timezone.utc

@@ -164,7 +164,7 @@ async def test_command_bar_runs_analyses_and_exports(tmp_path):
         app.query_one("#command", Input).value = f"export {out}"
         await pilot.press("enter")
         await pilot.pause()
-        data = json.loads(out.read_text())
+        data = json.loads(out.read_text(encoding="utf-8"))
         assert data["contentions"][0]["class_name"].endswith("CacheLIRS$Segment")
 
         await pilot.press(":")
@@ -191,9 +191,9 @@ async def test_export_dialog(tmp_path, fmt, check):
         await pilot.click("#export")
         await pilot.pause()
         assert not isinstance(app.screen, ExportDialog)
-        assert check in target.read_text()
+        assert check in target.read_text(encoding="utf-8")
         if fmt == "json":
-            assert len(json.loads(target.read_text())) == 3
+            assert len(json.loads(target.read_text(encoding="utf-8"))) == 3
 
 
 @pytest.fixture
@@ -285,7 +285,7 @@ async def test_chart_html_export(tmp_path):
         dialog.query_one("#path", Input).value = str(target)
         await pilot.click("#export")
         await pilot.pause()
-        page = target.read_text()
+        page = target.read_text(encoding="utf-8")
         assert page.startswith("<!doctype html>") and "<svg" in page and "HTTP requests" in page
 
 
@@ -301,7 +301,7 @@ async def test_export_format_follows_file_extension(tmp_path):
         assert app.screen.query_one("#format", Select).value == "json"
         await pilot.press("enter")
         await _until(app, pilot, lambda: target.exists())
-        assert len(json.loads(target.read_text())) == 7
+        assert len(json.loads(target.read_text(encoding="utf-8"))) == 7
 
 
 async def test_chart_expands_other():
@@ -351,4 +351,19 @@ async def test_command_line_export_creates_folders(tmp_path):
         app.query_one("#command", Input).value = f"export {target}"
         await pilot.press("enter")
         await _until(app, pilot, lambda: target.exists())
-        assert "threads:" in target.read_text()
+        assert "threads:" in target.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("line", "windows", "words"),
+    [
+        ("export /tmp/out.json", False, ["export", "/tmp/out.json"]),
+        ('requests -m "io.wcm." --tz UTC', False, ["requests", "-m", "io.wcm.", "--tz", "UTC"]),
+        (r"export C:\Users\me\out.json", True, ["export", r"C:\Users\me\out.json"]),
+        (r'open "C:\My Dumps\incident 42"', True, ["open", r"C:\My Dumps\incident 42"]),
+    ],
+)
+def test_split_command(line, windows, words):
+    from tdscope.tui.app import split_command
+
+    assert split_command(line, windows=windows) == words
