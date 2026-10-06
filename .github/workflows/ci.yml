@@ -54,10 +54,16 @@ jobs:
       - run: pip install -e ".[dev,tui]"
       - run: pytest
 
+  package:
+    # Build and install the wheel on Linux/macOS/Windows before merging, not only after.
+    uses: ./.github/workflows/build.yml
+    with:
+      artifact-name: dist-ci
+
   ci-passed:
     name: ci-passed
     if: always()
-    needs: [lint, test]
+    needs: [lint, test, package]
     runs-on: ubuntu-latest
     steps:
       - name: All verification jobs succeeded
