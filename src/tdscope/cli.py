@@ -58,7 +58,14 @@ COMMANDS: dict[str, tuple[str, Analysis, Callable[..., None]]] = {
     ),
     "stuck": (
         "threads with the same stack across consecutive dumps",
-        lambda d, f, o: a.stuck(d, f, min_dumps=o.min_dumps, depth=o.depth, all_states=o.all_states),
+        lambda d, f, o: a.stuck(
+            d,
+            f,
+            min_dumps=o.min_dumps,
+            depth=o.depth,
+            all_states=o.all_states,
+            include_network_wait=o.include_network_wait,
+        ),
         report.render_stuck,
     ),
     "locks": (
@@ -142,6 +149,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers["stuck"].add_argument(
         "--all-states", action="store_true", help="also consider idle threads (WAITING / TIMED_WAITING)"
+    )
+    subparsers["stuck"].add_argument(
+        "--include-network-wait",
+        action="store_true",
+        help="also report background (non-request) threads blocked in a socket read",
     )
     return parser
 

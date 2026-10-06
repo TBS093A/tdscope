@@ -117,8 +117,9 @@ tdscope locks dumps/ -t 5
   pooled threads, so a request thread may be hours old while serving a 50 ms request.
   tdscope reports it as *thread age* and never uses it as a request duration.
 - **Request age** is computed only when the container writes the request start time
-  (epoch millis) into the thread name, as Apache Sling / AEM does:
-  `qtp123-45 [1700000000000] GET /content/page.html HTTP/1.1`.
+  (epoch millis) into the thread name, as Apache Sling / AEM does, e.g.
+  `qtp123-45 [1700000000000] GET /content/page.html HTTP/1.1` or, on AEM as a Cloud
+  Service, `<client ip> [1700000000000] POST /path HTTP/1.1`.
   Dump timestamps are written in the JVM's local time without a zone, so pass the JVM's
   zone with `--tz` when it differs from the machine running tdscope. If the dump time
   appears to precede the request start, tdscope flags it and suggests `--tz`; a zone
@@ -130,7 +131,9 @@ tdscope locks dumps/ -t 5
   "Reference Handler", so dumps of several nodes can be analysed together.
 - `stuck` ignores idle threads by default: it considers RUNNABLE/BLOCKED threads and
   threads serving a request, minus threads "running" in well-known idle native frames
-  (selectors, `accept()`, ...). Use `--all-states` to see everything.
+  (selectors, `accept()`, ...). Background threads blocked in a socket read (HTTP/2
+  connection readers, long polling) are skipped as well; add `--include-network-wait`
+  to hunt for outbound calls without a read timeout. Request threads are always kept.
 
 ## Supported formats
 

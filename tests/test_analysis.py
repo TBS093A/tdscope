@@ -68,6 +68,22 @@ def test_stuck(all_dumps):
     assert (result[0].consecutive_dumps, result[0].span_s) == (3, 20.0)
 
 
+def test_stuck_skips_background_network_reads(aem_dumps):
+    import copy
+
+    dumps = copy.deepcopy(aem_dumps)
+    for dump in dumps:
+        reader = copy.deepcopy(next(t for t in dump.threads if t.name == "batch-worker-1"))
+        reader.name, reader.tid, reader.state = "OkHttp api.example.com", "0xbeef", "RUNNABLE"
+        reader.frames = [
+            "java.net.SocketInputStream.socketRead0(java.base@11.0.20/Native Method)",
+            "okhttp3.X.y(X.java:1)",
+        ]
+        dump.threads.append(reader)
+    assert "OkHttp api.example.com" not in {s.name for s in a.stuck(dumps, ThreadFilter())}
+    assert "OkHttp api.example.com" in {s.name for s in a.stuck(dumps, ThreadFilter(), include_network_wait=True)}
+
+
 def test_stuck_all_states_includes_idle_workers(aem_dumps):
     names = {s.name for s in a.stuck(aem_dumps, ThreadFilter(), all_states=True)}
     assert {"qtp1001-103", "batch-worker-1", "batch-worker-2"} <= names

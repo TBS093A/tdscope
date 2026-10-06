@@ -40,8 +40,25 @@ IDLE_NATIVE_FRAMES = (
 )
 
 
+# Top frames of a blocking network read: RUNNABLE while waiting for the remote side.
+# Normal for background clients (HTTP/2 connection readers, long polling).
+NETWORK_WAIT_FRAMES = (
+    "java.net.SocketInputStream.socketRead0",
+    "sun.nio.ch.SocketDispatcher.read0",
+    "sun.nio.ch.Net.poll",
+)
+
+
+def _top_method(thread: ThreadInfo) -> str | None:
+    return thread.frames[0].split("(", 1)[0] if thread.frames else None
+
+
 def is_idle_native(thread: ThreadInfo) -> bool:
-    return bool(thread.frames) and thread.frames[0].split("(", 1)[0] in IDLE_NATIVE_FRAMES
+    return _top_method(thread) in IDLE_NATIVE_FRAMES
+
+
+def is_network_wait(thread: ThreadInfo) -> bool:
+    return _top_method(thread) in NETWORK_WAIT_FRAMES
 
 
 # Lock kinds meaning "I want this lock and cannot proceed" (as opposed to Object.wait()).
@@ -340,12 +357,14 @@ def stuck(
     min_dumps: int = 3,
     depth: int = 20,
     all_states: bool = False,
+    include_network_wait: bool = False,
 ) -> list[StuckThread]:
     """Threads that keep the same stack over ``min_dumps`` consecutive dumps.
 
     By default only RUNNABLE/BLOCKED threads and threads serving an HTTP request are
     considered, because idle pool workers legitimately keep an identical stack. Threads
-    "running" in a known idle native frame (see :data:`IDLE_NATIVE_FRAMES`) are skipped too.
+    "running" in a known idle native frame (see :data:`IDLE_NATIVE_FRAMES`) are skipped too,
+    and so are background threads blocked in a network read unless ``include_network_wait``.
     """
 
     def interesting(t: ThreadInfo) -> bool:
@@ -353,7 +372,9 @@ def stuck(
             return False
         if all_states or t.request is not None:
             return True
-        return t.state in ("RUNNABLE", "BLOCKED") and not is_idle_native(t)
+        if is_idle_native(t) or (is_network_wait(t) and not include_network_wait):
+            return False
+        return t.state in ("RUNNABLE", "BLOCKED")
 
     result = []
     for series in by_jvm(dumps):

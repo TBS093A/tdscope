@@ -54,6 +54,17 @@ def test_request_parsing():
     )
 
 
+def test_request_with_client_ip_prefix():
+    # AEM as a Cloud Service names request threads "<client ip> [<start>] <request line>"
+    r = parse_request("192.0.2.10 [1714125143000] POST /libs/wcm/core/content/reference.json HTTP/1.1")
+    assert r is not None
+    assert (r.method, r.path, r.started_at_ms) == ("POST", "/libs/wcm/core/content/reference.json", 1714125143000)
+
+
+def test_jetty_acceptor_is_not_a_request():
+    assert parse_request("qtp1-83-acceptor-0@4bd6-ServerConnector@b308{HTTP/1.1, (http/1.1)}{0.0.0.0:8080}") is None
+
+
 def test_jdk11_dump(fixtures):
     (dump,) = load([str(fixtures / "aem-node1-1.dump")])
     assert dump.timestamp == datetime(2026, 10, 1, 12, 0, 0)
