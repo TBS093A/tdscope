@@ -14,7 +14,8 @@ def fixtures() -> Path:
 
 @pytest.fixture
 def all_dumps():
-    return load([str(FIXTURES)])
+    """The small hand-made fixtures (the aemcs/ set has its own tests)."""
+    return load([str(p) for p in sorted(FIXTURES.iterdir()) if p.is_file() and p.suffix != ".py"])
 
 
 @pytest.fixture

@@ -1,0 +1,121 @@
+2026-04-26 12:04:30
+Full thread dump Java HotSpot(TM) 64-Bit Server VM (11.0.19+9-LTS-224 mixed mode):
+
+Threads class SMR info:
+_java_thread_list=0x00005607d71a75d0, length=12, elements={
+0x00007f6ccc188800, 0x00007f6ccc189000, 0x00007f6ccc189800, 0x00007f6ccc18a000,
+0x00007f6ccc18a800, 0x00007f6ccc18b000, 0x00007f6ccc18b800, 0x00007f6ccc18c000,
+0x00007f6ccc18c800, 0x00007f6ccc18d000, 0x00007f6ccc18d800, 0x00007f6ccc18e000
+}
+
+"Reference Handler" #2 daemon prio=10 os_prio=0 cpu=10.00ms elapsed=3869.90s tid=0x00007f6ccc188800 nid=0x2d00 waiting on condition  [0x00007f9900000000]
+   java.lang.Thread.State: RUNNABLE
+	at java.lang.ref.Reference.waitForReferencePendingList(java.base@11.0.19/Native Method)
+	at java.lang.ref.Reference.processPendingReferences(java.base@11.0.19/Reference.java:241)
+	at java.lang.ref.Reference$ReferenceHandler.run(java.base@11.0.19/Reference.java:213)
+
+   Locked ownable synchronizers:
+	- None
+
+"Signal Dispatcher" #4 daemon prio=9 os_prio=0 cpu=10.00ms elapsed=3869.90s tid=0x00007f6ccc189000 nid=0x2d01 runnable  
+   java.lang.Thread.State: RUNNABLE
+
+   Locked ownable synchronizers:
+	- None
+
+"qtp1996920089-84-acceptor-0@4bd63113-ServerConnector@b308372{HTTP/1.1, (http/1.1)}{0.0.0.0:8080}" #84 prio=3 os_prio=0 cpu=830.85ms elapsed=3830.00s tid=0x00007f6ccc189800 nid=0x2d02 runnable  [0x00007f9900002000]
+   java.lang.Thread.State: RUNNABLE
+	at sun.nio.ch.ServerSocketChannelImpl.accept0(java.base@11.0.19/Native Method)
+	at sun.nio.ch.ServerSocketChannelImpl.accept(java.base@11.0.19/ServerSocketChannelImpl.java:533)
+	at org.eclipse.jetty.server.ServerConnector.accept(ServerConnector.java:388)
+	at java.lang.Thread.run(java.base@11.0.19/Thread.java:834)
+
+   Locked ownable synchronizers:
+	- None
+
+"qtp1996920089-85" #85 prio=5 os_prio=0 cpu=10.00ms elapsed=3830.00s tid=0x00007f6ccc18a000 nid=0x2d03 runnable  [0x00007f9900003000]
+   java.lang.Thread.State: RUNNABLE
+	at sun.nio.ch.EPoll.wait(java.base@11.0.19/Native Method)
+	at sun.nio.ch.EPollSelectorImpl.doSelect(java.base@11.0.19/EPollSelectorImpl.java:120)
+	- locked <0x00000006c0a00010> (a sun.nio.ch.Util$2)
+	at org.eclipse.jetty.io.ManagedSelector.nioSelect(ManagedSelector.java:183)
+	at java.lang.Thread.run(java.base@11.0.19/Thread.java:834)
+
+   Locked ownable synchronizers:
+	- None
+
+"qtp1996920089-90" #90 prio=5 os_prio=0 cpu=10.00ms elapsed=3830.00s tid=0x00007f6ccc18a800 nid=0x2d04 waiting on condition  [0x00007f9900004000]
+   java.lang.Thread.State: TIMED_WAITING (parking)
+	at jdk.internal.misc.Unsafe.park(java.base@11.0.19/Native Method)
+	- parking to wait for  <0x00000006c0a00020> (a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)
+	at java.util.concurrent.locks.LockSupport.parkNanos(java.base@11.0.19/LockSupport.java:234)
+	at org.eclipse.jetty.util.BlockingArrayQueue.poll(BlockingArrayQueue.java:382)
+	at org.eclipse.jetty.util.thread.QueuedThreadPool$Runner.run(QueuedThreadPool.java:1018)
+	at java.lang.Thread.run(java.base@11.0.19/Thread.java:834)
+
+   Locked ownable synchronizers:
+	- None
+
+"OkHttp api.example.com" #845 daemon prio=5 os_prio=0 cpu=3.50ms elapsed=3270.00s tid=0x00007f6ccc18b000 nid=0x2d05 runnable  [0x00007f9900005000]
+   java.lang.Thread.State: RUNNABLE
+	at java.net.SocketInputStream.socketRead0(java.base@11.0.19/Native Method)
+	at java.net.SocketInputStream.socketRead(java.base@11.0.19/SocketInputStream.java:115)
+	at java.net.SocketInputStream.read(java.base@11.0.19/SocketInputStream.java:168)
+	at okio.Okio$2.read(Okio.java:140)
+	at okhttp3.internal.http2.Http2Reader.nextFrame(Http2Reader.java:89)
+	at okhttp3.internal.http2.Http2Connection$ReaderRunnable.execute(Http2Connection.java:577)
+	at okhttp3.internal.NamedRunnable.run(NamedRunnable.java:32)
+	at java.lang.Thread.run(java.base@11.0.19/Thread.java:834)
+
+   Locked ownable synchronizers:
+	- None
+
+"OkHttp ConnectionPool" #846 daemon prio=5 os_prio=0 cpu=10.00ms elapsed=3270.00s tid=0x00007f6ccc18b800 nid=0x2d06 in Object.wait()  [0x00007f9900006000]
+   java.lang.Thread.State: TIMED_WAITING (on object monitor)
+	at java.lang.Object.wait(java.base@11.0.19/Native Method)
+	- waiting on <no object reference available>
+	at java.lang.Object.wait(java.base@11.0.19/Object.java:462)
+	at okhttp3.internal.connection.RealConnectionPool.lambda$new$0(RealConnectionPool.java:62)
+	- waiting to re-lock in wait() <0x00000006c0a00030> (a okhttp3.internal.connection.RealConnectionPool)
+	at okhttp3.internal.connection.RealConnectionPool$$Lambda$2863/0x0000000801b5a840.run(Unknown Source)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(java.base@11.0.19/ThreadPoolExecutor.java:1128)
+	at java.lang.Thread.run(java.base@11.0.19/Thread.java:834)
+
+   Locked ownable synchronizers:
+	- None
+
+"Service Poller for status" #296 daemon prio=5 os_prio=0 cpu=172.67ms elapsed=3770.00s tid=0x00007f6ccc18c000 nid=0x2d07 runnable  [0x00007f9900007000]
+   java.lang.Thread.State: RUNNABLE
+	at java.net.SocketInputStream.socketRead0(java.base@11.0.19/Native Method)
+	at java.net.SocketInputStream.socketRead(java.base@11.0.19/SocketInputStream.java:115)
+	at org.apache.http.impl.io.SessionInputBufferImpl.fillBuffer(SessionInputBufferImpl.java:153)
+	at org.apache.http.impl.conn.DefaultHttpResponseParser.parseHead(DefaultHttpResponseParser.java:138)
+	at org.apache.http.impl.execchain.MainClientExec.execute(MainClientExec.java:272)
+	at java.lang.Thread.run(java.base@11.0.19/Thread.java:834)
+
+   Locked ownable synchronizers:
+	- None
+
+"203.0.113.7 [1777204810000] GET /content/example/de.html HTTP/1.1" #377 prio=5 os_prio=0 cpu=10.00ms elapsed=3570.00s tid=0x00007f6ccc18c800 nid=0x2d08 waiting on condition  [0x00007f9900008000]
+   java.lang.Thread.State: TIMED_WAITING (parking)
+	at jdk.internal.misc.Unsafe.park(java.base@11.0.19/Native Method)
+	- parking to wait for  <0x00000006c0b00000> (a java.util.concurrent.CompletableFuture$Signaller)
+	at java.util.concurrent.CompletableFuture.timedGet(java.base@11.0.19/CompletableFuture.java:1939)
+	at io.wcm.caconfig.extensions.persistence.impl.PagePersistenceStrategy.load(PagePersistenceStrategy.java:91)
+	at org.apache.sling.engine.impl.SlingRequestProcessorImpl.processRequest(SlingRequestProcessorImpl.java:151)
+	at org.apache.sling.engine.impl.SlingMainServlet.service(SlingMainServlet.java:156)
+	at org.eclipse.jetty.server.HttpChannel.handle(HttpChannel.java:501)
+	at org.eclipse.jetty.util.thread.QueuedThreadPool$Runner.run(QueuedThreadPool.java:1034)
+	at java.lang.Thread.run(java.base@11.0.19/Thread.java:834)
+
+   Locked ownable synchronizers:
+	- None
+
+"VM Thread" os_prio=0 cpu=3300.00ms elapsed=3870.00s tid=0x00007f6ccc18d000 nid=0x2d09 runnable  
+
+"GC Thread#0" os_prio=0 cpu=9100.00ms elapsed=3870.00s tid=0x00007f6ccc18d800 nid=0x2d0a runnable  
+
+"VM Periodic Task Thread" os_prio=0 cpu=3308.40ms elapsed=3870.00s tid=0x00007f6ccc18e000 nid=0x2d0b waiting on condition  
+
+JNI global refs: 98, weak refs: 3
+
