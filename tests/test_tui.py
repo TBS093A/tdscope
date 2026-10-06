@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import time
 from pathlib import Path
 
 import pytest
@@ -122,9 +123,12 @@ async def test_form_keeps_values_and_rejects_invalid_input():
         assert isinstance(app.screen, AnalysisForm)
         assert "--match" in str(app.screen.query_one("#error", Static).render())
 
-        app.screen.query_one("#f-match", Input).value = "io.wcm., oak"
         app.screen.query_one("#f-top_only", Checkbox).value = True
-        await pilot.click("#run")
+        match = app.screen.query_one("#f-match", Input)
+        match.value = "io.wcm., oak"
+        match.focus()
+        await pilot.pause()  # the error message changed the layout
+        await pilot.press("enter")  # Enter in any field submits the form
         await _until(app, pilot, lambda: app.last is not None and app.last[0].command == "frames")
         assert app.last[0].match == ["io.wcm.", "oak"] and app.last[0].top_only
 
@@ -192,7 +196,17 @@ async def test_export_dialog(tmp_path, fmt, check):
             assert len(json.loads(target.read_text())) == 3
 
 
-async def test_timeline_chart():
+@pytest.fixture
+def warsaw_local_time(monkeypatch):
+    """Run with a non-UTC local zone (CI runners use UTC, developers often do not)."""
+    monkeypatch.setenv("TZ", "Europe/Warsaw")
+    time.tzset()
+    yield
+    monkeypatch.undo()
+    time.tzset()
+
+
+async def test_timeline_chart(warsaw_local_time):
     app = TdscopeApp(str(AEMCS))
     async with app.run_test(size=SIZE) as pilot:
         await _until(app, pilot, lambda: app.last is not None)  # folder loaded, summary shown

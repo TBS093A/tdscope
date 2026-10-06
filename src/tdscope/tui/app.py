@@ -200,7 +200,10 @@ class ChartScreen(Screen[None]):
 
     @on(ChartWidget.Hovered)
     def _hovered(self, event: ChartWidget.Hovered) -> None:
-        hover = self.query_one("#hover", Static)
+        panels = self.query("#hover").results(Static)  # empty while the screen is closing
+        hover = next(panels, None)
+        if hover is None:
+            return
         points = event.points
         if not points:
             hover.update(Text("no point here", style="dim"))
@@ -348,7 +351,9 @@ class TdscopeApp(App[None]):
         self.query_one("#info", Static).update(text)
 
     def _details(self, text: str | Text) -> None:
-        self.query_one("#details", Static).update(text if isinstance(text, Text) else Text(text))
+        # query() instead of query_one(): late events may arrive while the app shuts down
+        for panel in self.query("#details").results(Static):
+            panel.update(text if isinstance(text, Text) else Text(text))
 
     # -- loading ---------------------------------------------------------------------
 
