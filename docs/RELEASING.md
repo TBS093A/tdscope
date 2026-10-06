@@ -5,7 +5,7 @@
 | When | Workflow | What happens |
 |------|----------|--------------|
 | every commit (locally) | `pre-commit` | gitleaks, ruff, no real thread dumps, no private words (from a git-ignored list) |
-| pull request (**pre-merge gate**) | `CI` | ruff, mypy, tests on Python 3.10-3.14 (Linux) plus macOS and Windows |
+| pull request (**pre-merge gate**) | `CI` | ruff, mypy, tests on Python 3.10-3.14 (Linux) plus macOS and Windows; build the wheel, install it and smoke-test it on the 3 OSes |
 | | `Security` | gitleaks over the full history, CodeQL (Python + workflows) and bandit (SAST), pip-audit and dependency review (SCA), fuzzing + hostile input + exported HTML in a real browser (dynamic testing) |
 | merge to `main` (**post-merge**) | `Post-merge` | build sdist + wheel, verify metadata and contents, install and smoke-test on Linux/macOS/Windows, publish a dev build (`X.Y.Z.devN`) to **TestPyPI** |
 | tag `vX.Y.Z` (**release**) | `Release` | tag and changelog checks, the full `CI` and `Security` workflows again, build and verification, **manual approval**, publish to **PyPI**, GitHub release with build provenance, install from PyPI and smoke-test on 3 OSes |
