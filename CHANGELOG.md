@@ -8,3 +8,6 @@ First public release.
   dumps embedded in logs, gzip, CRLF, JVM deadlock reports).
 - Analyses: `summary`, `requests`, `frames`, `hotspots`, `stuck`, `locks`, `cpu`.
 - Text and JSON output.
+- `tdscope tui`: k9s-style terminal UI (optional `tui` extra) with forms for every
+  analysis, a command line, export to text/JSON and a timeline graph (thread count or
+  duration over time, colored by group, hover details, HTML export).

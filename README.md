@@ -9,8 +9,9 @@ Command-line analyzer for Java (HotSpot) thread dumps. Point it at a directory o
 - **who blocks whom**: lock owners, their waiters and JVM-detected deadlocks,
 - **who burns CPU** between two dumps.
 
-It has no runtime dependencies (Python 3.10+ standard library only), so it also runs
-on a locked-down production box.
+The CLI has no runtime dependencies (Python 3.10+ standard library only), so it also
+runs on a locked-down production box. An optional [interactive TUI](#interactive-tui)
+with a timeline graph needs [Textual](https://textual.textualize.io/).
 
 ## Installation
 
@@ -110,6 +111,37 @@ Who holds the lock everybody is waiting for?
 ```bash
 tdscope locks dumps/ -t 5
 ```
+
+## Interactive TUI
+
+```bash
+pip install 'tdscope[tui]'
+tdscope tui dumps/            # or just `tdscope tui` and press <o>
+```
+
+A [k9s](https://k9scli.io/)-style terminal UI on top of the same analyses:
+
+| Key | Action |
+|-----|--------|
+| `o` | open a folder (or file) with thread dumps |
+| `s` `r` `f` `h` `k` `l` `c` | summary, requests, frames, hotspots, stuck, locks, cpu: opens a form with the analysis options, shows the equivalent CLI command, runs it |
+| `↑` `↓` | browse results; the panel below shows the full report and example stack of the selected row |
+| `:` | command line, e.g. `:requests -m io.wcm. --tz UTC`, `:open ~/dumps`, `:export out.json` |
+| `x` | export the current output as plain text or JSON (the format follows the file extension) |
+| `g` | timeline graph |
+| `q` | quit |
+
+The **timeline graph** puts dump time on the X axis and colors threads by group, with
+a legend:
+
+- `m` switches the Y axis between *thread count* per group and *duration* (one point
+  per thread: request age when the request start is known, else thread age; log scale);
+- `b` groups threads by pool (ids and counters normalized), by state, or by request;
+- `j` switches between JVMs (dumps of one JVM process, or all of them);
+- hover a point with the mouse, or move with the arrow keys / `n` `p`, to see the
+  thread, its state, duration, CPU and top frames;
+- `1`-`9` hide or show a group, `z` changes the time zone, `e` exports the chart as a
+  self-contained HTML page with hover tooltips.
 
 ## How to read the numbers
 

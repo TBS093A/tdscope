@@ -1,4 +1,8 @@
-"""Command line interface: ``tdscope <analysis> [options] PATH...``."""
+"""Command line interface: ``tdscope <analysis> [options] PATH...`` and ``tdscope tui``.
+
+The helpers :func:`parse_analysis`, :func:`make_filter`, :func:`run_analysis` and
+:func:`write_result` are shared with the TUI, so both front ends behave identically.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +11,7 @@ import contextlib
 import re
 import sys
 from collections.abc import Callable, Sequence
-from typing import Any
+from typing import Any, NoReturn, TextIO
 
 from . import __version__, report
 from . import analysis as a
@@ -16,6 +20,21 @@ from .loader import DEFAULT_PATTERNS, load
 from .model import ThreadDump
 
 Analysis = Callable[[Sequence[ThreadDump], ThreadFilter, argparse.Namespace], Any]
+
+
+class CommandError(Exception):
+    """Invalid command line (raised instead of exiting when used from the TUI)."""
+
+
+class _RaisingParser(argparse.ArgumentParser):
+    def error(self, message: str) -> NoReturn:
+        raise CommandError(f"{self.prog}: {message}")
+
+    def print_help(self, file: Any = None) -> NoReturn:
+        raise CommandError(self.format_help())
+
+    def exit(self, status: int = 0, message: str | None = None) -> NoReturn:
+        raise CommandError(message or "")
 
 
 def _tz(value: str) -> Any:
@@ -81,7 +100,8 @@ COMMANDS: dict[str, tuple[str, Analysis, Callable[..., None]]] = {
 }
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser(raise_errors: bool = False) -> argparse.ArgumentParser:
+    parser_class = _RaisingParser if raise_errors else argparse.ArgumentParser
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("paths", nargs="+", metavar="PATH", help="dump files or directories (recursive); '-' for stdin")
     sel = common.add_argument_group("thread selection")
@@ -120,13 +140,17 @@ def build_parser() -> argparse.ArgumentParser:
     outp.add_argument("--max-stack-lines", type=_positive_int, metavar="N", help="truncate printed stacks to N lines")
     outp.add_argument("-q", "--quiet", action="store_true", help="no progress information on stderr")
 
-    parser = argparse.ArgumentParser(
+    parser = parser_class(
         prog="tdscope",
         description="Analyze Java (HotSpot) thread dumps: requests, hot stacks, stuck threads, locks and CPU.",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     sub = parser.add_subparsers(dest="command", required=True, metavar="ANALYSIS")
     subparsers = {name: sub.add_parser(name, parents=[common], help=help_) for name, (help_, _, _) in COMMANDS.items()}
+    tui = sub.add_parser("tui", help="interactive terminal UI (needs: pip install 'tdscope[tui]')")
+    tui.add_argument("folder", nargs="?", metavar="PATH", help="folder or file with thread dumps to open")
+    tui.add_argument("--tz", type=_tz, metavar="ZONE", help="time zone of the JVM that wrote the dumps")
+    tui.add_argument("-g", "--glob", action="append", metavar="GLOB", help="file name patterns for directories")
 
     subparsers["requests"].add_argument(
         "--keep-query", action="store_true", help="do not strip the query string when grouping paths"
@@ -158,16 +182,20 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    parser = build_parser()
-    opts = parser.parse_args(argv)
-    _, run, render = COMMANDS[opts.command]
+def parse_analysis(args: Sequence[str]) -> argparse.Namespace:
+    """Parse ``ANALYSIS [options] PATH...`` raising :class:`CommandError` instead of exiting."""
+    opts = build_parser(raise_errors=True).parse_args(list(args))
+    if opts.command == "tui":
+        raise CommandError("tui: already running")
+    make_filter(opts)  # validate patterns early
+    return opts
 
+
+def make_filter(opts: argparse.Namespace) -> ThreadFilter:
     if opts.command == "frames" and not opts.match:
-        parser.error("frames: at least one --match PATTERN is required")
-
+        raise CommandError("frames: at least one --match PATTERN is required")
     try:
-        flt = ThreadFilter(
+        return ThreadFilter(
             frame_patterns=opts.match,
             regex=opts.regex,
             states=opts.state,
@@ -175,7 +203,50 @@ def main(argv: Sequence[str] | None = None) -> int:
             http_only=opts.http_only,
         )
     except re.error as exc:
-        parser.error(f"invalid pattern: {exc}")
+        raise CommandError(f"invalid pattern: {exc}") from exc
+
+
+def run_analysis(opts: argparse.Namespace, dumps: Sequence[ThreadDump]) -> Any:
+    _, run, _ = COMMANDS[opts.command]
+    result = run(dumps, make_filter(opts), opts)
+    if opts.top and isinstance(result, list) and opts.command != "cpu":
+        result = result[: opts.top]
+    elif opts.top and isinstance(result, a.LockReport):
+        result.contentions = result.contentions[: opts.top]
+    return result
+
+
+def write_result(
+    command: str,
+    result: Any,
+    out: TextIO,
+    fmt: str = "text",
+    show_stack: bool = False,
+    max_lines: int | None = None,
+) -> None:
+    if fmt == "json":
+        report.to_json(result, out)
+    else:
+        _, _, render = COMMANDS[command]
+        render(result, out, show_stack=show_stack, max_lines=max_lines)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = build_parser()
+    opts = parser.parse_args(argv)
+
+    if opts.command == "tui":
+        try:
+            from .tui import run_tui
+        except ImportError:
+            print("tdscope: the TUI needs Textual: pip install 'tdscope[tui]'", file=sys.stderr)
+            return 2
+        return run_tui(opts.folder, tz=opts.tz, patterns=opts.glob or DEFAULT_PATTERNS)
+
+    try:
+        make_filter(opts)
+    except CommandError as exc:
+        parser.error(str(exc))
 
     try:
         dumps = load(opts.paths, patterns=opts.glob or DEFAULT_PATTERNS)
@@ -189,15 +260,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         sources = len({d.source for d in dumps})
         print(f"tdscope: {len(dumps)} dump(s) from {sources} file(s)", file=sys.stderr)
 
-    result = run(dumps, flt, opts)
-    if opts.top and isinstance(result, list) and opts.command != "cpu":
-        result = result[: opts.top]
-
+    result = run_analysis(opts, dumps)
     with open(opts.output, "w", encoding="utf-8") if opts.output else contextlib.nullcontext(sys.stdout) as out:
-        if opts.format == "json":
-            report.to_json(result, out)
-        else:
-            render(result, out, show_stack=opts.stack, max_lines=opts.max_stack_lines)
+        write_result(opts.command, result, out, opts.format, opts.stack, opts.max_stack_lines)
     return 0
 
 

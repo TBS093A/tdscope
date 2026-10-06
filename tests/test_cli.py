@@ -44,3 +44,8 @@ def test_no_dumps(tmp_path):
 def test_invalid_timezone(fixtures):
     with pytest.raises(SystemExit):
         main(["requests", str(fixtures), "--tz", "Mars/Olympus"])
+
+
+def test_top_limits_lock_contentions(fixtures, capsys):
+    assert main(["locks", str(fixtures / "aemcs"), "-t", "1", "-f", "json", "-q"]) == 0
+    assert len(json.loads(capsys.readouterr().out)["contentions"]) == 1
