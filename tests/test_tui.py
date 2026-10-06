@@ -338,3 +338,15 @@ async def test_chart_expands_other():
         await pilot.press("escape")
         await pilot.pause()
         assert not isinstance(app.screen, ChartScreen)
+
+
+async def test_command_line_export_creates_folders(tmp_path):
+    app = TdscopeApp(str(AEMCS))
+    async with app.run_test(size=SIZE) as pilot:
+        await _until(app, pilot, lambda: app.last is not None)
+        target = tmp_path / "new" / "folder" / "summary.txt"
+        await pilot.press(":")
+        app.query_one("#command", Input).value = f"export {target}"
+        await pilot.press("enter")
+        await _until(app, pilot, lambda: target.exists())
+        assert "threads:" in target.read_text()

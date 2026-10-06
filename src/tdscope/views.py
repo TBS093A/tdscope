@@ -101,13 +101,20 @@ def _stuck(result: list[a.StuckThread]) -> Table:
 def _locks(result: a.LockReport) -> Table:
     rows: list[list[str]] = []
     details: list[str] = []
+
+    def split(label: str) -> tuple[str, str]:  # "path (2026-05-12 10:13:00)" -> (time, path)
+        path, _, when = label.rpartition(" (")
+        return (when.rstrip(")"), path) if path else ("-", label)
+
     for label, names in result.deadlocks:
-        rows.append(["DEADLOCK", "", str(len(names)), " <-> ".join(names), "", label])
+        when, dump = split(label)
+        rows.append([when, str(len(names)), "DEADLOCK", "", " <-> ".join(names), dump])
         details.append(_render(report.render_locks, a.LockReport(deadlocks=[(label, names)])))
     for c in result.contentions:
-        rows.append([c.class_name or "?", c.address, str(len(c.waiters)), c.owner or "?", c.owner_state or "", c.dump])
+        when, dump = split(c.dump)
+        rows.append([when, str(len(c.waiters)), c.class_name or "?", c.owner_state or "", c.owner or "?", dump])
         details.append(_render(report.render_locks, a.LockReport(contentions=[c])).removeprefix("No lock contention"))
-    return Table(["lock", "address", "waiters", "owner", "owner state", "dump"], rows, details)
+    return Table(["time", "waiters", "lock", "owner state", "owner", "dump"], rows, details)
 
 
 def _cpu(result: list[a.CpuInterval]) -> Table:

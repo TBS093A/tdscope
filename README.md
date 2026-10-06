@@ -116,42 +116,19 @@ tdscope locks dumps/ -t 5
 
 ```bash
 pip install 'tdscope[tui]'
-tdscope tui dumps/            # or just `tdscope tui` and press <o>
+tdscope tui dumps/ --tz UTC
 ```
 
-A [k9s](https://k9scli.io/)-style terminal UI on top of the same analyses:
+A [k9s](https://k9scli.io/)-style terminal UI on top of the same analyses. One key per
+analysis opens a form with its options. Results appear in a table with the full report
+of the selected row. A `:` command line takes CLI arguments, and results export to text
+or JSON. The **timeline graph** plots threads over time (count per group, or the
+duration of every thread), colored by pool, family, code, state or request, with hover
+details and a self-contained HTML export.
 
-| Key | Action |
-|-----|--------|
-| `o` | open a folder (or file) with thread dumps |
-| `s` `r` `f` `h` `k` `l` `c` | summary, requests, frames, hotspots, stuck, locks, cpu: opens a form with the analysis options, shows the equivalent CLI command, runs it |
-| `↑` `↓` | browse results; the panel below shows the full report and example stack of the selected row |
-| `:` | command line, e.g. `:requests -m io.wcm. --tz UTC`, `:open ~/dumps`, `:export out.json` |
-| `x` | export the current output as plain text or JSON (the format follows the file extension) |
-| `g` | timeline graph |
-| `q` | quit |
+![tdscope TUI timeline graph](docs/screenshots/07-timeline-count.svg)
 
-The **timeline graph** puts dump time on the X axis and colors threads by group, with
-a legend:
-
-- `m` switches the Y axis between *thread count* per group and *duration* (one point
-  per thread: request age when the request start is known, else thread age; log scale);
-- `b` changes the grouping:
-  - `pool`: thread pool name, ids and counters normalized (`sling-threadpool-*-(…)-N`);
-  - `family`: coarser name families (`JVM internal`, `Jetty (qtp)`, `sling-oak`, `OkHttp`, …);
-  - `code`: what the thread executes, i.e. the package of its top-most non-JDK frame
-    (`org.apache.jackrabbit`, `okhttp3`, …); JDK-only stacks are recognised by their
-    characteristic frame (`idle: executor worker`, `idle: java.util.Timer`, …);
-  - `state` (`java.lang.Thread.State`) or `request` (HTTP method and path);
-- groups that do not get one of the 9 colors are merged into **other**: the legend lists
-  what it is made of, hovering an "other" point shows the breakdown at that moment, and
-  `o` charts just those groups with their own colors (repeat to go deeper, `esc` to go
-  back);
-- `j` switches between JVMs (dumps of one JVM process, or all of them);
-- hover a point with the mouse, or move with the arrow keys / `n` `p`, to see the
-  thread, its state, duration, CPU and top frames;
-- `1`-`9` hide or show a group, `z` changes the time zone, `e` exports the chart as a
-  self-contained HTML page with hover tooltips.
+**[TUI guide with screenshots and all keys](docs/TUI.md)**
 
 ## How to read the numbers
 

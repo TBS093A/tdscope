@@ -91,7 +91,7 @@ class AnalysisForm(ModalScreen[list[str] | None]):
             with VerticalScroll(id="fields"):
                 for f in self.fields:
                     if f.kind == "bool":
-                        yield Checkbox(f.label, bool(self.values.get(f.dest)), id=f"f-{f.dest}")
+                        yield Checkbox(f.label, bool(self.values.get(f.dest)), id=f"f-{f.dest}", compact=True)
                     else:
                         yield Label(f.label)
                         restrict = r"[0-9]*" if f.kind == "int" else None
@@ -100,6 +100,7 @@ class AnalysisForm(ModalScreen[list[str] | None]):
                             placeholder=f.placeholder,
                             id=f"f-{f.dest}",
                             restrict=restrict,
+                            compact=True,
                         )
             yield Static(id="preview")
             yield Static(id="error")

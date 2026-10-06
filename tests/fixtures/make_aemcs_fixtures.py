@@ -45,6 +45,15 @@ SLING_REQUEST = [
     f"at java.lang.Thread.run({J}/Thread.java:834)",
 ]
 SEGMENT = "org.apache.jackrabbit.oak.cache.CacheLIRS$Segment"
+IDLE_POOL_FRAMES = [
+    f"at jdk.internal.misc.Unsafe.park({J}/Native Method)",
+    "- parking to wait for  <0x00000006c0a00020> "
+    "(a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)",
+    f"at java.util.concurrent.locks.LockSupport.parkNanos({J}/LockSupport.java:234)",
+    "at org.eclipse.jetty.util.BlockingArrayQueue.poll(BlockingArrayQueue.java:382)",
+    "at org.eclipse.jetty.util.thread.QueuedThreadPool$Runner.run(QueuedThreadPool.java:1018)",
+    f"at java.lang.Thread.run({J}/Thread.java:834)",
+]
 
 
 @dataclass
@@ -151,15 +160,7 @@ def base_threads(dump_no: int) -> list[Thread]:
             90,
             40.0,
             "TIMED_WAITING (parking)",
-            frames=[
-                f"at jdk.internal.misc.Unsafe.park({J}/Native Method)",
-                "- parking to wait for  <0x00000006c0a00020> "
-                "(a java.util.concurrent.locks.AbstractQueuedSynchronizer$ConditionObject)",
-                f"at java.util.concurrent.locks.LockSupport.parkNanos({J}/LockSupport.java:234)",
-                "at org.eclipse.jetty.util.BlockingArrayQueue.poll(BlockingArrayQueue.java:382)",
-                "at org.eclipse.jetty.util.thread.QueuedThreadPool$Runner.run(QueuedThreadPool.java:1018)",
-                f"at java.lang.Thread.run({J}/Thread.java:834)",
-            ],
+            frames=IDLE_POOL_FRAMES,
         ),
         Thread(
             "OkHttp api.example.com",

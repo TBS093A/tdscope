@@ -6,7 +6,7 @@ import argparse
 import io
 import shlex
 from collections.abc import Sequence
-from datetime import timezone, tzinfo
+from datetime import datetime, timezone, tzinfo
 from pathlib import Path
 from typing import Any
 
@@ -88,6 +88,12 @@ ChartScreen #hover { padding: 0 1; }
 def _short(text: str, root: str | None) -> str:
     """Strip the opened folder from file paths inside ``text``."""
     return text.replace(root.rstrip("/") + "/", "") if root else text
+
+
+def _span(start: datetime, end: datetime) -> str:
+    if start.date() == end.date():
+        return f"{start:%Y-%m-%d %H:%M} - {end:%H:%M}"
+    return f"{start:%Y-%m-%d %H:%M} - {end:%Y-%m-%d %H:%M}"
 
 
 def _display_path(path: str | None, width: int = 44) -> str:
@@ -377,7 +383,7 @@ class TdscopeApp(App[None]):
         text.append(f"{len(self.dumps)}   JVMs: {jvms}   threads: {threads}\n")
         timed = [d.timestamp for d in self.dumps if d.timestamp]
         text.append("Span:    ", style="bold")
-        text.append(f"{min(timed):%Y-%m-%d %H:%M} - {max(timed):%Y-%m-%d %H:%M}\n" if timed else "-\n")
+        text.append(f"{_span(min(timed), max(timed))}\n" if timed else "-\n")
         text.append("TZ:      ", style="bold")
         text.append(f"{self.tz or 'local'}\n")
         text.append(f"tdscope {__version__}", style="dim")
@@ -553,6 +559,7 @@ class TdscopeApp(App[None]):
         opts, result = self.last
         target = Path(path).expanduser()
         try:
+            target.parent.mkdir(parents=True, exist_ok=True)
             with open(target, "w", encoding="utf-8") as out:
                 write_result(opts.command, result, out, fmt, show_stack=with_stacks)
         except OSError as exc:

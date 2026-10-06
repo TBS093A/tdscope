@@ -8,6 +8,7 @@ from tdscope import analysis as a
 from tdscope.views import to_table
 
 AEMCS = Path(__file__).parent / "fixtures" / "aemcs"
+SEGMENT = "org.apache.jackrabbit.oak.cache.CacheLIRS$Segment"
 
 
 @pytest.fixture(scope="module")
@@ -46,5 +47,6 @@ def test_request_table(dumps):
 
 def test_lock_table_lists_owner(dumps):
     table = to_table("locks", RESULTS["locks"](dumps))
-    assert table.rows[0][0] == "org.apache.jackrabbit.oak.cache.CacheLIRS$Segment"
-    assert table.rows[0][2] == "7" and "GET /sites.html" in table.rows[0][3]
+    when, waiters, lock, owner_state, owner, dump = table.rows[0]
+    assert (when, waiters, lock, owner_state) == ("2026-04-26 12:00:00", "7", SEGMENT, "RUNNABLE")
+    assert "GET /sites.html" in owner and dump.endswith("12-00-00.dump")
