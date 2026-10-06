@@ -1,0 +1,57 @@
+12345:
+2026-10-02 08:30:00
+Full thread dump OpenJDK 64-Bit Server VM (21.0.4+7-LTS mixed mode, sharing):
+
+Threads class SMR info:
+_java_thread_list=0x00007f0000001000, length=2, elements={
+0x00007f0000010000, 0x00007f0000011000
+}
+
+"worker-A" #31 [4101] prio=5 os_prio=0 cpu=12.50ms elapsed=30.00s tid=0x00007f000000001f nid=4101 waiting for monitor entry  [0x00007f0000aa0000]
+   java.lang.Thread.State: BLOCKED (on object monitor)
+	at com.example.Transfer.debit(Transfer.java:10)
+	- waiting to lock <0x0000000700000b00> (a com.example.Account)
+	- locked <0x0000000700000a00> (a com.example.Account)
+	at com.example.Transfer.run(Transfer.java:5)
+	at java.lang.Thread.runWith(java.base@21.0.4/Thread.java:1596)
+	at java.lang.Thread.run(java.base@21.0.4/Thread.java:1583)
+
+   Locked ownable synchronizers:
+	- None
+
+
+"worker-B" #32 [4102] prio=5 os_prio=0 cpu=12.50ms elapsed=30.00s tid=0x00007f0000000020 nid=4102 waiting for monitor entry  [0x00007f0000aa0000]
+   java.lang.Thread.State: BLOCKED (on object monitor)
+	at com.example.Transfer.debit(Transfer.java:10)
+	- waiting to lock <0x0000000700000a00> (a com.example.Account)
+	- locked <0x0000000700000b00> (a com.example.Account)
+	at com.example.Transfer.run(Transfer.java:5)
+	at java.lang.Thread.runWith(java.base@21.0.4/Thread.java:1596)
+	at java.lang.Thread.run(java.base@21.0.4/Thread.java:1583)
+
+   Locked ownable synchronizers:
+	- None
+
+
+"VM Thread" os_prio=0 cpu=5.00ms elapsed=30.10s tid=0x00007f0000020000 nid=4090 runnable  
+
+JNI global refs: 10, weak refs: 0
+
+
+Found one Java-level deadlock:
+=============================
+"worker-A":
+  waiting to lock monitor 0x00007f0000300000 (object 0x0000000700000b00, a com.example.Account),
+  which is held by "worker-B"
+
+"worker-B":
+  waiting to lock monitor 0x00007f0000300100 (object 0x0000000700000a00, a com.example.Account),
+  which is held by "worker-A"
+
+Java stack information for the threads listed above:
+===================================================
+"worker-A":
+	at com.example.Transfer.debit(Transfer.java:10)
+	- waiting to lock <0x0000000700000b00> (a com.example.Account)
+
+Found 1 deadlock.

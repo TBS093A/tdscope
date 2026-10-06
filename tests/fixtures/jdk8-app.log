@@ -1,0 +1,24 @@
+01.10.2026 11:59:59.000 *INFO* [main] com.example.App started
+2026-10-01 12:00:00
+Full thread dump Java HotSpot(TM) 64-Bit Server VM (25.381-b09 mixed mode):
+
+"main" #1 prio=5 os_prio=0 tid=0x00007f1c2400a000 nid=0x4e21 runnable [0x00007f1c2b5fe000]
+   java.lang.Thread.State: RUNNABLE
+	at java.io.FileInputStream.readBytes(Native Method)
+	at com.example.App.main(App.java:12)
+
+"Finalizer" #3 daemon prio=8 os_prio=0 tid=0x00007f1c240c1000 nid=0x4e25 in Object.wait() [0x00007f1c0f9fe000]
+   java.lang.Thread.State: WAITING (on object monitor)
+	at java.lang.Object.wait(Native Method)
+	- waiting on <0x00000000d5588ed0> (a java.lang.ref.ReferenceQueue$Lock)
+	at java.lang.ref.ReferenceQueue.remove(ReferenceQueue.java:144)
+	- locked <0x00000000d5588ed0> (a java.lang.ref.ReferenceQueue$Lock)
+	at java.lang.ref.Finalizer$FinalizerThread.run(Finalizer.java:216)
+
+"VM Thread" os_prio=0 tid=0x00007f1c240b7800 nid=0x4e24 runnable 
+
+JNI global references: 9
+
+Heap
+ PSYoungGen      total 76288K, used 3932K [0x000000076b400000, 0x0000000770900000, 0x00000007c0000000)
+01.10.2026 12:00:01.000 *INFO* [main] com.example.App still running
