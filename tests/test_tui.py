@@ -199,6 +199,8 @@ async def test_export_dialog(tmp_path, fmt, check):
 @pytest.fixture
 def warsaw_local_time(monkeypatch):
     """Run with a non-UTC local zone (CI runners use UTC, developers often do not)."""
+    if not hasattr(time, "tzset"):
+        pytest.skip("time.tzset() is not available on Windows")
     monkeypatch.setenv("TZ", "Europe/Warsaw")
     time.tzset()
     yield

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling>=1.18"]
+requires = ["hatchling>=1.18", "hatch-vcs>=0.4"]
 build-backend = "hatchling.build"
 
 [project]
@@ -26,7 +26,9 @@ dependencies = []
 
 [project.optional-dependencies]
 tui = ["textual>=8"]
-dev = ["pytest>=7", "pytest-asyncio>=0.23", "ruff>=0.5", "mypy>=1.8", "textual>=8"]
+dev = ["pytest>=7", "pytest-asyncio>=0.23", "hypothesis>=6.100", "ruff>=0.5", "mypy>=1.8", "textual>=8"]
+security = ["bandit>=1.8", "pip-audit>=2.7", "playwright>=1.45"]
+release = ["build>=1.2", "twine>=5", "check-wheel-contents>=0.6"]
 
 [project.scripts]
 tdscope = "tdscope.cli:main"
@@ -36,15 +38,21 @@ Homepage = "https://github.com/TBS093A/tdscope"
 Issues = "https://github.com/TBS093A/tdscope/issues"
 
 [tool.hatch.version]
-path = "src/tdscope/__init__.py"
+# Version comes from git tags: v0.2.0 -> 0.2.0, commits after it -> 0.2.1.devN (TestPyPI builds).
+source = "vcs"
+raw-options = { local_scheme = "no-local-version" }
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/tdscope/_version.py"
 
 [tool.hatch.build.targets.sdist]
-include = ["src", "tests", "README.md", "LICENSE", "CHANGELOG.md"]
+include = ["src", "tests", "docs/TUI.md", "README.md", "LICENSE", "CHANGELOG.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src", "tests", "tests/fixtures"]
 asyncio_mode = "auto"
+markers = ["dast: dynamic security tests (fuzzing, hostile input, exported HTML in a browser)"]
 asyncio_default_fixture_loop_scope = "function"
 
 [tool.ruff]
@@ -64,3 +72,9 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
 python_version = "3.10"
 strict = true
 files = ["src"]
+
+[tool.bandit]
+exclude_dirs = ["tests", "docs"]
+# B101: asserts only narrow types for mypy, never guard security decisions.
+# B105: false positive on the literal "daemon" in the thread header parser.
+skips = ["B101", "B105"]

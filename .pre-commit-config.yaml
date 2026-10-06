@@ -1,0 +1,41 @@
+# Local quality gate: `pip install pre-commit && pre-commit install`
+# The same checks run in CI (see .github/workflows/security.yml).
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+      - id: detect-private-key
+      - id: end-of-file-fixer
+        exclude: ^(tests/fixtures/|docs/screenshots/)
+      - id: trailing-whitespace
+        exclude: ^(tests/fixtures/|docs/screenshots/)  # thread dumps keep their trailing spaces
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.10
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: no-thread-dumps
+        name: no real thread dumps
+        entry: python scripts/check_no_thread_dumps.py
+        language: system
+        types: [text]
+      - id: private-patterns
+        name: no private words (patterns from git-ignored .private-patterns)
+        entry: python scripts/check_private_patterns.py
+        language: system
+        types: [text]

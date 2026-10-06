@@ -34,7 +34,7 @@ from ..timeline import (
     format_duration,
     to_html,
 )
-from ..views import Table, to_table
+from ..views import Table, strip_root, to_table
 from .chart import ChartWidget
 from .screens import COMMAND_FIELDS, COMMON_FIELDS, AnalysisForm, ExportDialog, OpenFolder
 
@@ -87,7 +87,7 @@ ChartScreen #hover { padding: 0 1; }
 
 def _short(text: str, root: str | None) -> str:
     """Strip the opened folder from file paths inside ``text``."""
-    return text.replace(root.rstrip("/") + "/", "") if root else text
+    return strip_root(text, root) if root else text
 
 
 def _span(start: datetime, end: datetime) -> str:
@@ -287,7 +287,8 @@ class ChartScreen(Screen[None]):
     def action_export(self) -> None:
         def writer(path: str, fmt: str, _stacks: bool) -> None:
             assert self.chart is not None
-            Path(path).write_text(to_html(self.chart, f"tdscope timeline: {self.jvms[self.jvm_index][0]}"))
+            page = to_html(self.chart, f"tdscope timeline: {self.jvms[self.jvm_index][0]}")
+            Path(path).write_text(page, encoding="utf-8")
 
         name = f"tdscope-timeline-{self.mode}-{self.group_by}"
         self.app.push_screen(

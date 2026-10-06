@@ -1,5 +1,6 @@
 import gzip
 from datetime import datetime
+from pathlib import Path
 
 from tdscope import load, parse_lines
 from tdscope.parser import parse_request, parse_thread_header
@@ -142,6 +143,6 @@ def test_gzip_and_directory_scan(tmp_path, fixtures):
 
 
 def test_jvm_identity(all_dumps):
-    ids = {d.source.rsplit("/", 1)[-1]: d.jvm_id for d in all_dumps}
+    ids = {Path(d.source).name: d.jvm_id for d in all_dumps}
     assert ids["aem-node1-1.dump"] == ids["aem-node1-2.dump"] == ids["aem-node1-3.dump"]
     assert len(set(ids.values())) == 3

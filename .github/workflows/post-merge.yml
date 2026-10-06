@@ -1,0 +1,39 @@
+# After a merge to main: build and verify the distributions, then publish a development
+# build (e.g. 0.2.1.dev4) to TestPyPI. Real releases go to PyPI from tags: release.yml.
+name: Post-merge
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: post-merge
+  cancel-in-progress: false
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+
+  publish-testpypi:
+    name: publish dev build to TestPyPI
+    needs: build
+    # Enabled once the TestPyPI trusted publisher exists (docs/RELEASING.md).
+    if: vars.TESTPYPI_PUBLISH == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/tdscope/${{ needs.build.outputs.version }}/
+    permissions:
+      id-token: write # trusted publishing (OIDC), no API token stored anywhere
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: dist
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true

@@ -8,6 +8,7 @@ its example stack).
 from __future__ import annotations
 
 import io
+import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -145,7 +146,13 @@ def to_table(command: str, result: Any, root: str | None = None) -> Table:
     """Table for an analysis result; ``root`` is stripped from file paths for brevity."""
     table = _VIEWS[command](result)
     if root:
-        prefix = root.rstrip("/") + "/"
-        table.rows = [[cell.replace(prefix, "") for cell in row] for row in table.rows]
-        table.details = [d.replace(prefix, "") for d in table.details]
+        table.rows = [[strip_root(cell, root) for cell in row] for row in table.rows]
+        table.details = [strip_root(d, root) for d in table.details]
     return table
+
+
+def strip_root(text: str, root: str) -> str:
+    """Remove the opened folder from file paths inside ``text`` (both separators on Windows)."""
+    for sep in {"/", os.sep}:
+        text = text.replace(root.rstrip("/" + os.sep) + sep, "")
+    return text

@@ -175,11 +175,13 @@ for group in analysis.hotspots(dumps, ThreadFilter(states=["BLOCKED"]), depth=8)
 
 ## Development
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the setup, the pre-commit hooks and the
+quality gate, and [docs/RELEASING.md](docs/RELEASING.md) for the CI/CD pipelines and
+releases.
+
 ```bash
-pip install -e ".[dev]"
+pip install -e ".[dev,tui]" pre-commit && pre-commit install
 pytest
-ruff check . && ruff format --check .
-mypy
 ```
 
 Test fixtures in `tests/fixtures/` are synthetic. Please never commit real thread
